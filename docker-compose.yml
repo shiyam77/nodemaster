@@ -1,0 +1,76 @@
+version: "3.7"
+
+# Define all services
+services:
+  webapp:
+    # We want to use the image which is build from our Dockerfile
+    # build: .
+    # Apache is running on port 80 but we want to expose this to port 4000 on our local machine
+    image: registry.gitlab.com/compliance-app/app:master
+    ports:
+      - 3000:3000
+    # We depending on the mysql backend
+    depends_on:
+      - mongodb
+    links:
+      - mongodb
+      - redis
+    networks:
+      - apinet
+    #volumes:
+    #  - .:/var/www/html/
+    environment:
+
+  mongodb:
+    image: mongo
+    ports:
+      - 27017:27017
+    #    environment:
+    #      - MONGO_INITDB_ROOT_USERNAME=admin
+    #      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - apinet
+  mongo-express:
+    image: mongo-express
+    ports:
+      - 8080:8081
+    depends_on:
+      - mongodb
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=password
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_BASICAUTH_USERNAME=username
+      - ME_CONFIG_BASICAUTH_PASSWORD=password
+    networks:
+      - apinet
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - 6379:6379
+    volumes:
+      - redis-data:/data/db
+    networks:
+      - apinet
+  redis-commander:
+    container_name: redis-commander
+    hostname: redis-commander
+    image: rediscommander/redis-commander:latest
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - apinet
+networks:
+  apinet:
+    driver: bridge
+volumes:
+  mongo-data:
+    driver: local
+  redis-data:
+    driver: local

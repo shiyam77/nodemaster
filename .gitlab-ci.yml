@@ -1,0 +1,58 @@
+# Node docker image on which this would be run
+image: node:14.16
+
+before_script:
+  - apt-get update -qy
+  - apt-get install -y ruby-dev
+  - gem install dpl
+
+cache:
+  paths:
+    - node_modules/
+
+stages:
+  - lint
+  - deploy_staging
+  - Build image
+
+Lint:
+  stage: lint
+  script:
+    - npm install
+    - npm run lint
+  only:
+    - master
+
+# Job 2:
+# Deploy to staging
+Staging:
+  stage: deploy_staging
+  image: ruby:latest
+  script:
+    - dpl --provider=heroku --app=$HEROKU_APP_NAME --api-key=$HEROKU_API_KEY
+  only:
+    - master
+
+docker build:
+  image: docker:19.03.8
+  only:
+    refs:
+      - staging
+      - production
+  stage: Build image
+  cache:
+    untracked: true
+    key: "$CI_BUILD_REF_NAME"
+    paths:
+      - node_modules/
+  services:
+    - docker:19.03.8-dind
+  variables:
+    IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+  before_script:
+    - ls
+    - pwd
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
